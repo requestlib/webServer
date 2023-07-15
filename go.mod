@@ -1,3 +1,3 @@
-module myweb
+module webServer
 
 go 1.19
