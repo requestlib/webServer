@@ -10,11 +10,25 @@ import (
 	"webServer/log/logger"
 )
 
+// 注册接收消息体
 type RegistInfo struct {
 	PhoneNumber string `json:"phone_number"`
 	Nick        string `json:"nick"`
 	Password    string `json:"password"`
 }
+
+// 登录接收消息体
+type LoginInfo struct {
+	PhoneNumber string `json:"phone_number"`
+	Password    string `json:"password"`
+}
+
+// 【临时】 数据库格式
+const (
+	PhoneNumberIdx int16 = iota
+	NickIdx
+	PasswordIdx
+)
 
 type PathRouter struct {
 }
@@ -25,6 +39,9 @@ func (p *PathRouter) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	} else if r.URL.Path == "/regist" {
 		registUser(w, r)
+		return
+	} else if r.URL.Path == "/login" {
+		loginUser(w, r)
 		return
 	}
 	http.NotFound(w, r)
@@ -58,6 +75,47 @@ func registUser(w http.ResponseWriter, r *http.Request) {
 		logger.Writer.Error("%v", err)
 	}
 	csvWriter.Flush()
+}
+
+// 用户登录
+// 暂时先写入csv文件作为数据库 TODO:改成mysql数据库
+func loginUser(w http.ResponseWriter, r *http.Request) {
+	// 解析body
+	var loginInfo LoginInfo
+	err := json.NewDecoder(r.Body).Decode(&loginInfo)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer r.Body.Close()
+	logger.Writer.Info("body: %+v", loginInfo)
+	// 数据库查询是否登录成功 (暂时先用csv文件)
+	csvPath := "/root/liweiran/project/webServer/data/user_info.csv"
+	csvObj, err := os.Open(csvPath)
+	if err != nil {
+		logger.Writer.Error("open csv file: %v", err)
+	}
+	defer csvObj.Close()
+
+	reader := csv.NewReader(csvObj)
+	records, err := reader.ReadAll()
+	if err != nil {
+		logger.Writer.Error("read csv file: %v", err)
+	}
+	var is_match bool = false //用户是否登录成功
+	for _, record := range records {
+		phoneNumber, password := record[PhoneNumberIdx], record[PasswordIdx]
+		if loginInfo.Password == password && loginInfo.PhoneNumber == phoneNumber {
+			is_match = true
+			break
+		}
+	}
+	if is_match {
+		fmt.Fprint(w, "success")
+	} else {
+		fmt.Fprint(w, "fail")
+	}
+
 }
 
 // 默认
